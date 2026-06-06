@@ -37,7 +37,7 @@ from collections import deque
 _IS_ANDROID = "ANDROID_ROOT" in os.environ or "ANDROID_DATA" in os.environ
 if _IS_ANDROID:
     _CFG_DIR  = Path(__file__).parent / ".config" / "QuantumDownloader"
-    _DL_DIR   = str(Path.home() / "Download")
+    _DL_DIR   = str(Path(__file__).parent / "downloads")
 else:
     _CFG_DIR  = Path.home() / ".config" / "QuantumDownloader"
     _DL_DIR   = str(Path.home() / "Downloads")
@@ -426,6 +426,8 @@ class DownloadCard(ft.Container):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _open_file_or_folder(path):
+    if _IS_ANDROID:
+        return
     sys_name = platform.system()
     if sys_name == "Windows":
         subprocess.run(["explorer", "/select,", path], check=False)
@@ -510,15 +512,15 @@ class ActiveView(ft.Container):
         )
 
         self.content = ft.Column([
-            ft.Text("Active Downloads", size=26, weight=ft.FontWeight.W_800,
+            ft.Text("Active Downloads", size=22, weight=ft.FontWeight.W_800,
                     color=T["text_primary"]),
-            ft.Text("Manage and monitor your queue", size=12, color=T["text_sec"]),
+            ft.Text("Manage and monitor your queue", size=11, color=T["text_sec"]),
             ft.Container(height=8),
             url_bar,
             ft.Container(height=8),
             self._card_stack,
         ], spacing=4, expand=True)
-        self.padding = 28
+        self.padding = ft.padding.symmetric(horizontal=16, vertical=12)
 
     def _from_bar(self, e):
         url = self._url_input.value.strip()
@@ -583,13 +585,13 @@ class CompletedView(ft.Container):
         )
 
         self.content = ft.Column([
-            ft.Text("Completed", size=26, weight=ft.FontWeight.W_800,
+            ft.Text("Completed", size=22, weight=ft.FontWeight.W_800,
                     color=T["text_primary"]),
-            ft.Text("Your finished downloads", size=12, color=T["text_sec"]),
+            ft.Text("Your finished downloads", size=11, color=T["text_sec"]),
             ft.Container(height=12),
             self._stack,
         ], spacing=4, expand=True)
-        self.padding = 28
+        self.padding = ft.padding.symmetric(horizontal=16, vertical=12)
 
     def add_card(self, card: DownloadCard):
         self._cards.append(card)
@@ -676,7 +678,7 @@ class SettingsView(ft.Container):
             on_submit=self._save_cc,
         )
 
-        speed_cc_row = ft.Row([self._spd_field, self._cc_field], spacing=24)
+        speed_cc_row = ft.Row([self._spd_field, self._cc_field], spacing=12, wrap=True)
 
         # Behaviour checkboxes
         self._cb_toggle    = ft.Checkbox(label="Minimise to system tray",
@@ -747,7 +749,7 @@ class SettingsView(ft.Container):
                         expand=True, text_align=ft.TextAlign.RIGHT),
             ),
         ], spacing=6, scroll=ft.ScrollMode.AUTO, expand=True)
-        self.padding = 28
+        self.padding = ft.padding.symmetric(horizontal=16, vertical=12)
 
     def _toggle(self, key, e):
         SETTINGS[key] = e.control.value
@@ -785,7 +787,7 @@ class QuantumApp:
         page.title = "QuantumDownloader"
         page.theme_mode = ft.ThemeMode.DARK
         page.bgcolor = T["bg_base"]
-        page.scroll = ft.ScrollMode.NO_SCROLL
+        page.scroll = ft.ScrollMode.ADAPTIVE
         page.padding = 0
         page.update()
 
@@ -794,7 +796,7 @@ class QuantumApp:
         self._completed_view = CompletedView(page)
         self._settings_view  = SettingsView(page, self._on_settings_change)
 
-        # Stack all views
+        # Stack all views (only one visible at a time)
         self._view_stack = ft.Stack(
             [self._active_view, self._completed_view, self._settings_view],
             expand=True,
@@ -802,141 +804,70 @@ class QuantumApp:
         self._completed_view.visible = False
         self._settings_view.visible  = False
 
-        # Sidebar
-        self._nav_buttons: list[ft.Container] = []
-        self._build_sidebar()
+        # KPI chips (shared, shown in header)
+        self._chip_active = ft.Container(
+            content=ft.Column([
+                ft.Text("0", size=18, weight=ft.FontWeight.W_700, color=T["accent"]),
+                ft.Text("ACTIVE", size=8, weight=ft.FontWeight.W_600, color=T["text_sec"]),
+            ], spacing=0, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            border=ft.border.all(1, T["border"]),
+            border_radius=8, bgcolor=T["bg_card"], padding=ft.padding.symmetric(horizontal=14, vertical=6),
+        )
+        self._chip_completed = ft.Container(
+            content=ft.Column([
+                ft.Text("0", size=18, weight=ft.FontWeight.W_700, color=T["accent"]),
+                ft.Text("DONE", size=8, weight=ft.FontWeight.W_600, color=T["text_sec"]),
+            ], spacing=0, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            border=ft.border.all(1, T["border"]),
+            border_radius=8, bgcolor=T["bg_card"], padding=ft.padding.symmetric(horizontal=14, vertical=6),
+        )
+        self._lbl_speed_total = ft.Text("↓ 0 KB/s", size=11, weight=ft.FontWeight.W_600, color=T["accent"])
 
-        # Main layout: sidebar + content
-        main_row = ft.Row([
-            self._sidebar_container,
-            ft.Container(content=self._view_stack, expand=True, bgcolor=T["bg_base"]),
-        ], spacing=0, expand=True)
+        # ── Header ─────────────────────────────────────────────────────────
+        header = ft.Container(
+            content=ft.Row([
+                ft.Row([
+                    ft.Text("Q", size=20, weight=ft.FontWeight.W_900, color=T["accent"]),
+                    ft.Text("DOWNLOADER", size=13, weight=ft.FontWeight.W_700, color=T["text_primary"]),
+                ], spacing=4),
+                ft.Container(expand=True),
+                self._lbl_speed_total,
+                ft.Container(width=8),
+                self._chip_active,
+                self._chip_completed,
+            ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            bgcolor=T["bg_panel"],
+            padding=ft.padding.symmetric(horizontal=16, vertical=8),
+            border=ft.border.only(bottom=ft.BorderSide(1, T["border"])),
+        )
 
-        page.add(main_row)
+        # ── Bottom navigation ──────────────────────────────────────────────
+        self._nav_bar = ft.NavigationBar(
+            destinations=[
+                ft.NavigationDestination(icon=ft.icons.INSIGHTS_OUTLINED, selected_icon=ft.icons.INSIGHTS, label="Active"),
+                ft.NavigationDestination(icon=ft.icons.CHECK_CIRCLE_OUTLINE_OUTLINED, selected_icon=ft.icons.CHECK_CIRCLE, label="Completed"),
+                ft.NavigationDestination(icon=ft.icons.SETTINGS_OUTLINED, selected_icon=ft.icons.SETTINGS, label="Settings"),
+            ],
+            on_change=lambda e: self._switch_view(e.control.selected_index),
+            bgcolor=T["bg_panel"],
+            border=ft.border.all(1, T["border"]),
+        )
 
-        # Timers — use call_later for periodic tasks
+        # ── Main layout ────────────────────────────────────────────────────
+        page.add(
+            ft.Column([
+                header,
+                self._view_stack,
+                self._nav_bar,
+            ], spacing=0, expand=True),
+        )
+
+        # Timers
         self._schedule_refresh()
         self._schedule_queue_flush()
         self._schedule_clipboard()
 
-    # ── Sidebar ────────────────────────────────────────────────────────────
-
-    def _build_sidebar(self):
-        logo = ft.Container(
-            content=ft.Column([
-                ft.Text("QUANTUM", size=20, weight=ft.FontWeight.W_800,
-                        color=T["accent"], letter_spacing=1),
-                ft.Text("DOWNLOADER", size=10, weight=ft.FontWeight.W_400,
-                        color=T["text_dim"], letter_spacing=3),
-            ], spacing=0),
-            padding=ft.padding.only(left=6, top=20, bottom=8),
-        )
-
-        def make_nav(icon, label, idx):
-            btn = ft.Container(
-                content=ft.Row([
-                    ft.Icon(icon, size=20, color=T["text_sec"]),
-                    ft.Text(label, size=13, weight=ft.FontWeight.W_600,
-                            color=T["text_sec"]),
-                ], spacing=12),
-                border_radius=10,
-                padding=ft.padding.symmetric(horizontal=14, vertical=11),
-                ink=True,
-                on_click=lambda e, i=idx: self._switch_view(i),
-            )
-            return btn
-
-        # KPI chips
-        self._chip_active = ft.Container(
-            content=ft.Column([
-                ft.Text("0", size=24, weight=ft.FontWeight.W_700,
-                        color=T["accent"]),
-                ft.Text("ACTIVE", size=9, weight=ft.FontWeight.W_600,
-                        color=T["text_sec"], letter_spacing=1),
-            ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-            border=ft.border.all(1, T["border"]),
-            border_radius=10,
-            bgcolor=T["bg_card"],
-            padding=12,
-            expand=True,
-        )
-        self._chip_completed = ft.Container(
-            content=ft.Column([
-                ft.Text("0", size=24, weight=ft.FontWeight.W_700,
-                        color=T["accent"]),
-                ft.Text("COMPLETED", size=9, weight=ft.FontWeight.W_600,
-                        color=T["text_sec"], letter_spacing=1),
-            ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-            border=ft.border.all(1, T["border"]),
-            border_radius=10,
-            bgcolor=T["bg_card"],
-            padding=12,
-            expand=True,
-        )
-
-        chips = ft.Row([self._chip_active, self._chip_completed], spacing=8)
-
-        # Total speed
-        self._lbl_speed_total = ft.Container(
-            content=ft.Text("↓  0 KB/s", size=11, weight=ft.FontWeight.W_600,
-                            color=T["accent"]),
-            border=ft.border.all(1, "rgba(125,232,255,0.12)"),
-            border_radius=8,
-            bgcolor="rgba(125,232,255,0.07)",
-            padding=ft.padding.symmetric(horizontal=10, vertical=6),
-        )
-
-        version = ft.Text("v3.1 — Flet Edition", size=9, color=T["text_dim"])
-
-        # Build nav buttons
-        nav_items = [
-            (ft.icons.INSIGHTS, "Active", 0),
-            (ft.icons.CHECK_CIRCLE_OUTLINE, "Completed", 1),
-            (ft.icons.SETTINGS_OUTLINED, "Settings", 2),
-        ]
-        for icon, label, idx in nav_items:
-            btn = make_nav(icon, label, idx)
-            self._nav_buttons.append(btn)
-            if idx == 0:
-                btn.bgcolor = "rgba(125,232,255,0.10)"
-                btn.content.controls[0].color = T["accent"]
-                btn.content.controls[1].color = T["accent"]
-
-        self._sidebar_container = ft.Container(
-            content=ft.Column([
-                logo,
-                ft.Divider(height=1, color=T["border"]),
-                ft.Container(height=8),
-                *self._nav_buttons,
-                ft.Container(height=16),
-                ft.Divider(height=1, color=T["border"]),
-                ft.Container(height=8),
-                chips,
-                ft.Container(height=8),
-                self._lbl_speed_total,
-                ft.Container(expand=True),
-                version,
-            ], spacing=4),
-            width=200,
-            bgcolor=T["bg_panel"],
-            padding=ft.padding.symmetric(horizontal=12, vertical=8),
-            border=ft.border.only(right=ft.BorderSide(1, T["border"])),
-        )
-
-    def _update_nav_style(self, active_idx: int):
-        for i, btn in enumerate(self._nav_buttons):
-            if i == active_idx:
-                btn.bgcolor = "rgba(125,232,255,0.10)"
-                btn.content.controls[0].color = T["accent"]  # icon
-                btn.content.controls[1].color = T["accent"]  # text
-            else:
-                btn.bgcolor = None
-                btn.content.controls[0].color = T["text_sec"]
-                btn.content.controls[1].color = T["text_sec"]
-            btn.update()
-
     def _switch_view(self, idx: int):
-        self._update_nav_style(idx)
         self._active_view.visible    = (idx == 0)
         self._completed_view.visible = (idx == 1)
         self._settings_view.visible  = (idx == 2)
@@ -1048,7 +979,8 @@ class QuantumApp:
 
     def _schedule_clipboard(self):
         self._check_clipboard()
-        self._page.call_later(0.7, self._schedule_clipboard)
+        if not _IS_ANDROID:
+            self._page.call_later(0.7, self._schedule_clipboard)
 
     def _refresh_all_ui(self):
         self._active_view.refresh_all()
@@ -1066,7 +998,7 @@ class QuantumApp:
             txt = f"↓  {total:.0f} B/s"
         else:
             txt = "↓  0 KB/s"
-        self._lbl_speed_total.content.value = txt
+        self._lbl_speed_total.value = txt
         self._lbl_speed_total.update()
 
     def _update_chips(self):
@@ -1076,9 +1008,10 @@ class QuantumApp:
         self._chip_completed.content.controls[0].value = str(completed_cnt)
         self._chip_active.update()
         self._chip_completed.update()
+        self._lbl_speed_total.update()
 
     def _check_clipboard(self):
-        if not SETTINGS.get("clipboard_watch"):
+        if not SETTINGS.get("clipboard_watch") or _IS_ANDROID:
             return
         try:
             import pyperclip
@@ -1103,7 +1036,22 @@ class QuantumApp:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main(page: ft.Page):
-    app = QuantumApp(page)
+    try:
+        page.title = "QuantumDownloader"
+        page.theme_mode = ft.ThemeMode.DARK
+        app = QuantumApp(page)
+    except Exception as e:
+        page.clean()
+        page.add(ft.Container(
+            content=ft.Column([
+                ft.Text("Error", size=24, weight=ft.FontWeight.W_800, color="red"),
+                ft.Text(str(e), size=14, color=T["text_sec"]),
+                ft.Text("Please report this to the developer.", size=12, color=T["text_dim"]),
+            ], spacing=12, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            alignment=ft.alignment.center,
+            expand=True,
+            bgcolor=T["bg_base"],
+        ))
 
 
 def run():
