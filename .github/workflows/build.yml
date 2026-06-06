@@ -32,8 +32,9 @@ jobs:
             --org "com.quantumdownload" \
             --build-version "3.1.0" \
             --build-number 1 \
+            --module-name "main(flet)" \
             --yes \
-            main\(flet\).py
+            .
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -66,8 +67,9 @@ jobs:
             --org "com.quantumdownload" `
             --build-version "3.1.0" `
             --build-number 1 `
+            --module-name "main(flet)" `
             --yes `
-            "main(flet).py"
+            .
 
       - name: Upload EXE
         uses: actions/upload-artifact@v4
@@ -100,8 +102,9 @@ jobs:
             --org "com.quantumdownload" \
             --build-version "3.1.0" \
             --build-number 1 \
+            --module-name "main(flet)" \
             --yes \
-            "main(flet).py"
+            .
 
       - name: Upload Linux
         uses: actions/upload-artifact@v4
