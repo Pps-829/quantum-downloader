@@ -7,4 +7,4 @@ Thumbs.db
 build/
 dist/
 *.spec
-quantum_downloader.apk
+quantum_downloader*.apk
