@@ -1,0 +1,108 @@
+name: Build QuantumDownloader
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:       # Allows manual trigger from GitHub UI
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install flet-cli==0.85.2
+          pip install pyperclip
+
+      - name: Build APK
+        run: |
+          flet build apk \
+            --project quantum_downloader \
+            --product "QuantumDownloader" \
+            --org "com.quantumdownload" \
+            --build-version "3.1.0" \
+            --build-number 1 \
+            main\(flet\).py
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuantumDownloader-APK
+          path: build/apk/
+          if-no-files-found: error
+
+  build-exe:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install flet-cli==0.85.2
+          pip install pyperclip
+
+      - name: Build EXE
+        run: |
+          flet build windows `
+            --project quantum_downloader `
+            --product "QuantumDownloader" `
+            --org "com.quantumdownload" `
+            --build-version "3.1.0" `
+            --build-number 1 `
+            "main(flet).py"
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuantumDownloader-Windows
+          path: build/windows/
+          if-no-files-found: error
+
+  build-linux:
+    name: Build Linux AppImage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install flet-cli==0.85.2
+          pip install pyperclip
+
+      - name: Build Linux
+        run: |
+          flet build linux \
+            --project quantum_downloader \
+            --product "QuantumDownloader" \
+            --org "com.quantumdownload" \
+            --build-version "3.1.0" \
+            --build-number 1 \
+            "main(flet).py"
+
+      - name: Upload Linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuantumDownloader-Linux
+          path: build/linux/
+          if-no-files-found: error
