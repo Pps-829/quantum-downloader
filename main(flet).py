@@ -34,9 +34,14 @@ from collections import deque
 # ─────────────────────────────────────────────────────────────────────────────
 # SETTINGS  (persisted to app config dir)
 # ─────────────────────────────────────────────────────────────────────────────
-_CFG_DIR  = Path.home() / ".config" / "QuantumDownloader"
+_IS_ANDROID = "ANDROID_ROOT" in os.environ or "ANDROID_DATA" in os.environ
+if _IS_ANDROID:
+    _CFG_DIR  = Path(__file__).parent / ".config" / "QuantumDownloader"
+    _DL_DIR   = str(Path.home() / "Download")
+else:
+    _CFG_DIR  = Path.home() / ".config" / "QuantumDownloader"
+    _DL_DIR   = str(Path.home() / "Downloads")
 _CFG_FILE = _CFG_DIR / "settings.json"
-_DL_DIR   = str(Path.home() / "Downloads")
 
 DEFAULT_SETTINGS = {
     "download_dir":     _DL_DIR,
